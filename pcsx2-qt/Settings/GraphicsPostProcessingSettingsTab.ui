@@ -245,6 +245,11 @@
           <string>NxAGSS downsampling (Nx Automatic Grid SuperSampling)</string>
          </property>
         </item>
+        <item>
+         <property name="text">
+          <string>Blurred Border Fill</string>
+         </property>
+        </item>
        </widget>
       </item>
      </layout>
