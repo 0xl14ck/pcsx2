@@ -473,4 +473,63 @@ void ps_automagical_supersampling()
 }
 #endif
 
+#ifdef ps_blur_border
+
+// Blurred ambient border fill
+// Fills pillarbox/letterbox areas with a blurred, darkened copy of
+// the nearest game-image edge instead of solid black.
+
+#define BLUR_STEP      10.0   // tap spacing in window pixels
+#define BORDER_DARKEN  0.45   // brightness of border (0=black, 1=full)
+#define BORDER_SATURATE 0.55  // colour saturation of border (0=grey, 1=full)
+
+const float gaussW[7] = float[7](0.2042, 0.1802, 0.1238, 0.0663, 0.0277, 0.0090, 0.0022);
+
+vec3 sampleAtWindow(vec2 winPx)
+{
+	vec2 clamped = clamp(winPx, u_target_rect.xy, u_target_rect.zw);
+	vec2 gameSize = u_target_rect.zw - u_target_rect.xy;
+	vec2 t = (clamped - u_target_rect.xy) / gameSize;
+	vec2 uv = mix(u_source_rect.xy, u_source_rect.zw, t);
+	uv.y = u_source_rect.y + u_source_rect.w - uv.y;
+	return texture(TextureSampler, uv).rgb;
+}
+
+void ps_blur_border()
+{
+	vec2 fragWin = gl_FragCoord.xy;
+	fragWin.y = u_target_resolution.y - fragWin.y;
+
+	bool insideX = (fragWin.x >= u_target_rect.x && fragWin.x <= u_target_rect.z);
+	bool insideY = (fragWin.y >= u_target_rect.y && fragWin.y <= u_target_rect.w);
+
+	if (insideX && insideY)
+	{
+		SV_Target0 = sample_c();
+		return;
+	}
+
+	vec2 blurDir = vec2(0.0);
+	if (!insideX) blurDir.x = 1.0;
+	if (!insideY) blurDir.y = 1.0;
+	if (blurDir.x + blurDir.y > 1.0) blurDir *= 0.5;
+
+	vec3 col = vec3(0.0);
+	float wsum = 0.0;
+	for (int i = -6; i <= 6; i++)
+	{
+		float w = gaussW[abs(i)];
+		col  += sampleAtWindow(fragWin + blurDir * (float(i) * BLUR_STEP)) * w;
+		wsum += w;
+	}
+	col /= wsum;
+
+	float luma = dot(col, vec3(0.299, 0.587, 0.114));
+	col = mix(vec3(luma), col, BORDER_SATURATE) * BORDER_DARKEN;
+
+	SV_Target0 = vec4(col, 1.0);
+}
+
+#endif // ps_blur_border
+
 #endif
